@@ -230,7 +230,12 @@ USER QUERY:
     console.log('🧠 Prompt Sent to Groq:\n', prompt);
     console.log('📦 Product Count:', relevantProducts.length);
 
-    const reply = await askGroq(prompt, { budget, useCase, location });
+    const reply = await askGroq(prompt, {
+  budget: budget ?? undefined,
+  useCase,
+  location,
+});
+
     res.status(200).json({ reply });
   } catch (err: any) {
     console.error('[SHOPIFY_AI_ERROR]', err);
