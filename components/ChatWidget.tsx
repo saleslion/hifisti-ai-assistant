@@ -1,18 +1,50 @@
 import { useState } from 'react';
 
+type Message = {
+  role: 'user' | 'assistant';
+  text: string;
+};
+
 export default function ChatWidget() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', text: 'Hi! What can I help you find today?' },
   ]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    setMessages([...messages, { role: 'user', text: input }]);
+    const userMessage: Message = { role: 'user', text: input };
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    // TODO: Send input to backend (e.g., /api/chat)
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...messages, userMessage] }),
+      });
+
+      const data = await response.json();
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        text: data.reply || 'Sorry, I didn’t catch that. Could you try again?',
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error('❌ Error calling chat API:', err);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'Something went wrong. Please try again.' },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,7 +60,7 @@ export default function ChatWidget() {
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`max-w-[75%] p-3 rounded-xl ${
+              className={`max-w-[75%] p-3 rounded-xl whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'bg-blue-100 self-end ml-auto text-right'
                   : 'bg-gray-100 text-left'
@@ -37,6 +69,11 @@ export default function ChatWidget() {
               {msg.text}
             </div>
           ))}
+          {loading && (
+            <div className="bg-gray-100 p-3 rounded-xl max-w-[75%]">
+              Typing...
+            </div>
+          )}
         </div>
 
         {/* Input */}
@@ -47,12 +84,14 @@ export default function ChatWidget() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask something..."
             className="flex-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading}
           />
           <button
             type="submit"
-            className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition"
+            disabled={loading}
+            className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
           >
-            Send
+            {loading ? '...' : 'Send'}
           </button>
         </form>
       </div>
