@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const [products, articles] = await Promise.all([
-      fetchProducts(message),
+      fetchProducts(latestUserMessage),
       fetchArticles(),
     ]);
 
@@ -127,7 +127,7 @@ ARTICLES:
 ${formattedArticles || 'No articles available.'}
 
 The user said:
-"${message}"
+"${latestUserMessage}"
 
 Now respond with helpful advice using only the info above. If no products match, say so.
     `;
