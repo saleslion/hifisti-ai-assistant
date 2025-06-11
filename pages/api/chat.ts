@@ -27,10 +27,10 @@ type ProductNode = {
   variants: { edges: { node: { price: { amount: string } } }[] };
 };
 
-const fetchProducts = async (search: string): Promise<ProductNode[]> => {
+const fetchProducts = async (): Promise<ProductNode[]> => {
   const query = `
     {
-      products(first: 12, query: "${search}") {
+      products(first: 50) {
         edges {
           node {
             title
@@ -113,6 +113,8 @@ const extractBudgetFromMessage = (message: string): number | null => {
   return match ? parseFloat(match[1]) : null;
 };
 
+const normalizeText = (text: string) => text.toLowerCase().replace(/[^\w\s]/gi, '');
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages)) {
@@ -125,20 +127,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const budget = extractBudgetFromMessage(latestUserMessage);
+  const userQuery = normalizeText(latestUserMessage);
 
   try {
     const [products, articles] = await Promise.all([
-      fetchProducts(latestUserMessage),
+      fetchProducts(),
       fetchArticles(),
     ]);
 
-    const filteredProducts = budget
-      ? products.filter((p) =>
-          parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget
-        )
-      : products;
+    // Filter products by semantic relevance + budget
+    const relevantProducts = products.filter((p) => {
+      const title = normalizeText(p.title);
+      const description = normalizeText(p.description);
+      const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
+      const matchesQuery = title.includes(userQuery) || description.includes(userQuery);
+      const withinBudget = !budget || price <= budget;
+      return matchesQuery && withinBudget;
+    });
 
-    const formattedProducts = formatProducts(filteredProducts);
+    const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
@@ -160,7 +167,8 @@ ${formattedArticles || 'No articles available.'}
 👤 USER INPUT:
 "${latestUserMessage}"
 
-Please reply with helpful, accurate suggestions ONLY based on the above data. If no product matches, say so. Do not assume anything not explicitly given.
+Please reply with helpful, accurate suggestions ONLY based on the above data. Do not assume anything not explicitly given.
+If no product matches, say so in a helpful way.
 `;
 
     const reply = await askGroq(prompt);
