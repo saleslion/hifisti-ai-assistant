@@ -91,20 +91,20 @@ You already know:
 - Use case: ${useCase || 'not yet specified'}
 - Room type: ${location || 'not yet specified'}
 
-DO NOT ask the customer again for information they've already provided.
-
 🎯 Your job:
-- Recommend the best value-for-money speakers based on their needs.
-- If a customer wants Hi-Fi but is on a budget, explain trade-offs in sound quality and size.
-- DO NOT suggest products over 125% of their budget unless the user asks for premium options.
+- Recommend the most relevant product(s) based on the user's current query.
+- Users may ask for speakers, turntables, headphones, amps, etc.
+- Always tailor suggestions to their budget and use case.
+- If the user wants Hi-Fi but is on a budget, explain realistic trade-offs.
+- NEVER suggest products more than 125% over budget unless they ask for premium options.
 
 ✅ Format:
-- Product name as a **clickable link**
+- Product name (as a clickable link)
 - One-sentence benefit
 - Price
-- Image URL
+- Product image
 
-💡 Always sound like a helpful expert guiding the buyer to the best decision. Prioritize products that **fit or slightly stretch** the budget with a clear reason why.
+🧠 Be helpful, persuasive, and concise. Never repeat questions already answered. Always guide toward the next best decision.
 `.trim();
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -180,7 +180,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No valid user message found' });
     }
 
-    // Extract full context from chat history
     let budget: number | undefined;
     let useCase: string | undefined;
     let location: string | undefined;
@@ -202,27 +201,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const userQuery = normalizeText(latestUserMessage);
-
     const [products, articles] = await Promise.all([fetchProducts(), fetchArticles()]);
 
-    let relevantProducts = products.filter((p) => {
-      const combinedText = normalizeText(p.title + ' ' + p.description);
+    // ✅ Only budget filter — let Groq decide relevance (e.g., speakers, turntables)
+    const relevantProducts = products.filter((p) => {
       const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-      const matchesQuery = combinedText.includes(userQuery);
-      const withinBudget = !budget || price <= budget * 1.25; // Allow 25% upsell
-      return matchesQuery && withinBudget;
+      return !budget || price <= budget * 1.25;
     });
-
-    if (relevantProducts.length === 0 && userQuery) {
-      relevantProducts = products.filter((p) => {
-        const combinedText = normalizeText(p.title + ' ' + p.description);
-        return combinedText.includes(userQuery);
-      });
-    }
-
-    if (relevantProducts.length === 0) {
-      relevantProducts = products.slice(0, 5);
-    }
 
     const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
