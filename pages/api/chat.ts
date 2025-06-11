@@ -101,6 +101,13 @@ const formatArticles = (articles: any[]) => {
   }).join('\n\n');
 };
 
+// ✅ Budget extractor
+function extractBudgetFromMessage(message: string): string | null {
+  const euroPattern = /(?:under|less than|up to)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i;
+  const match = message.match(euroPattern);
+  return match?.[1] || null;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages)) {
@@ -111,6 +118,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!latestUserMessage) {
     return res.status(400).json({ error: 'No valid user message found' });
   }
+
+  const budget = extractBudgetFromMessage(latestUserMessage);
 
   try {
     const [products, articles] = await Promise.all([
@@ -125,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 You are a product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
 
 Your job is to recommend or guide users ONLY using the data from the store.
-Below is what you have access to:
+${budget ? `The user has a budget of €${budget}. Only recommend products within this price range.\n` : ''}
 
 PRODUCTS:
 ${formattedProducts || 'No products found.'}
