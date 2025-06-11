@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
+import '../styles/global.css';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState([]);
   const chatBoxRef = useRef(null);
+  const debounceTimer = useRef(null);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -17,7 +20,8 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/chat', { history: updatedMessages });
+      const contextMessages = updatedMessages.slice(-4); // reduce token usage
+      const response = await axios.post('/api/chat', { history: contextMessages });
       const botMsg = { role: 'assistant', content: response.data.reply };
       setMessages([...updatedMessages, botMsg]);
     } catch {
@@ -28,14 +32,42 @@ export default function Home() {
     }
   };
 
+  const fetchProducts = async () => {
+    const cached = sessionStorage.getItem('products');
+    if (cached) {
+      setProducts(JSON.parse(cached));
+      return;
+    }
+
+    try {
+      const res = await axios.get('/api/products'); // your endpoint for Shopify data
+      setProducts(res.data);
+      sessionStorage.setItem('products', JSON.stringify(res.data));
+    } catch {
+      setProducts([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
   useEffect(() => {
     chatBoxRef.current?.scrollTo({ top: chatBoxRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  const handleDebouncedInput = (e) => {
+    setInput(e.target.value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      if (e.key === 'Enter') sendMessage();
+    }, 300);
+  };
+
   return (
     <>
       <Head>
-        <title>Hifisti Shopping Assistant</title>
+        <title>Hifisti AI Assistant</title>
       </Head>
       <div className="app-container">
         <header className="app-header">🛍️ Hifisti AI Assistant</header>
@@ -50,18 +82,12 @@ export default function Home() {
         <div className="product-preview">
           <h3>Top Picks</h3>
           <div className="product-grid">
-            <div className="product-card">
-              <h4>Klipsch Jubilee</h4>
-              <p>Premium sound system with powerful bass.</p>
-            </div>
-            <div className="product-card">
-              <h4>Aiwa MSBTU-600</h4>
-              <p>Compact Hi-Fi with Bluetooth 5.0.</p>
-            </div>
-            <div className="product-card">
-              <h4>Klipschorn 75th SE</h4>
-              <p>Limited edition anniversary speakers.</p>
-            </div>
+            {products.map((product, index) => (
+              <div key={index} className="product-card">
+                <h4>{product.title}</h4>
+                <p>{product.description || 'No description'}</p>
+              </div>
+            ))}
           </div>
         </div>
         <div className="input-area">
@@ -70,7 +96,7 @@ export default function Home() {
             placeholder="Ask me anything..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            onKeyDown={(e) => handleDebouncedInput(e)}
           />
           <button onClick={sendMessage}>Send</button>
         </div>
