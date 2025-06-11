@@ -83,14 +83,26 @@ const askGroq = async (
 
   const { budget, useCase, location } = context;
 
-  const followUps = [];
-  if (!useCase) followUps.push('Will these be used for music, movies, or gaming?');
-  if (!budget) followUps.push('Do you have a budget range in mind?');
-  if (!location) followUps.push('Are these for a bedroom, living room, or a larger space?');
+  const systemPrompt = `
+You are a smart, persuasive, and sales-focused product advisor for the Shopify store Hifisti.
 
-  const followUpText = followUps.length
-    ? `After showing products, ask:\n- ${followUps.join('\n- ')}`
-    : '';
+Here is what you already know about the customer:
+- Budget: ${budget ? `€${budget}` : 'not yet specified'}
+- Use case: ${useCase || 'not yet specified'}
+- Room type: ${location || 'not yet specified'}
+
+Do NOT repeat questions for information already provided. Use this context to tailor your advice and product recommendations.
+
+Always start by recommending relevant products. Each product should include:
+- Name (as a clickable link)
+- One-sentence benefit
+- Price
+- Product image
+
+If the user hints at premium needs (e.g., hi-fi sound), recommend higher quality within budget or advise them on trade-offs.
+
+Stay helpful, focused on closing the sale, and speak like a trusted expert.
+`.trim();
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -101,26 +113,8 @@ const askGroq = async (
     body: JSON.stringify({
       model: 'llama3-70b-8192',
       messages: [
-        {
-          role: 'system',
-          content: `
-You are a sales-focused product advisor for the Shopify store Hifisti.
-
-Always start by recommending matching products (no greetings). Each should include:
-- Name (as a clickable link)
-- One-sentence benefit
-- Price
-- Product image
-
-Never repeat questions already answered in the user query. Keep your tone helpful, smart, and focused on closing the sale.
-
-${followUpText}
-        `.trim(),
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
       ],
     }),
   });
@@ -152,9 +146,7 @@ const formatArticles = (articles: any[]) => {
 };
 
 const extractBudgetFromMessage = (message: string): number | null => {
-  const match = message.match(
-    /(?:under|less than|up to|maximum|max)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i
-  );
+  const match = message.match(/(?:under|less than|up to|maximum|max)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i);
   return match ? parseFloat(match[1]) : null;
 };
 
@@ -185,9 +177,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No valid user message found' });
     }
 
-    const budget = extractBudgetFromMessage(latestUserMessage);
-    const useCase = extractUseCase(latestUserMessage);
-    const location = extractLocation(latestUserMessage);
+    // ✅ Extract full context from all messages, not just the last
+    let budget: number | undefined;
+    let useCase: string | undefined;
+    let location: string | undefined;
+
+    for (const msg of messages) {
+      if (msg.role !== 'user') continue;
+      if (!budget) {
+        const b = extractBudgetFromMessage(msg.content);
+        if (b) budget = b;
+      }
+      if (!useCase) {
+        const u = extractUseCase(msg.content);
+        if (u) useCase = u;
+      }
+      if (!location) {
+        const l = extractLocation(msg.content);
+        if (l) location = l;
+      }
+    }
+
     const userQuery = normalizeText(latestUserMessage);
 
     const [products, articles] = await Promise.all([fetchProducts(), fetchArticles()]);
@@ -231,10 +241,10 @@ USER QUERY:
     console.log('📦 Product Count:', relevantProducts.length);
 
     const reply = await askGroq(prompt, {
-  budget: budget ?? undefined,
-  useCase,
-  location,
-});
+      budget: budget ?? undefined,
+      useCase,
+      location,
+    });
 
     res.status(200).json({ reply });
   } catch (err: any) {
