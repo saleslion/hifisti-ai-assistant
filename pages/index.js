@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
-import '../styles/global.css';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
@@ -47,6 +46,23 @@ export default function Home() {
             </div>
           ))}
           {loading && <div className="message assistant">Thinking...</div>}
+        </div>
+        <div className="product-preview">
+          <h3>Top Picks</h3>
+          <div className="product-grid">
+            <div className="product-card">
+              <h4>Klipsch Jubilee</h4>
+              <p>Premium sound system with powerful bass.</p>
+            </div>
+            <div className="product-card">
+              <h4>Aiwa MSBTU-600</h4>
+              <p>Compact Hi-Fi with Bluetooth 5.0.</p>
+            </div>
+            <div className="product-card">
+              <h4>Klipschorn 75th SE</h4>
+              <p>Limited edition anniversary speakers.</p>
+            </div>
+          </div>
         </div>
         <div className="input-area">
           <input
