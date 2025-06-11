@@ -103,7 +103,7 @@ const formatProducts = (products: ProductNode[]) => {
 };
 
 const formatArticles = (articles: any[]) => {
-  return articles.map((a, idx) => {
+  return articles.map((a) => {
     return `📝 **${a.title}**\n${a.excerpt || a.contentHtml.slice(0, 200)}`;
   }).join('\n\n');
 };
@@ -135,12 +135,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchArticles(),
     ]);
 
-    // Filter products by semantic relevance + budget
     const relevantProducts = products.filter((p) => {
       const title = normalizeText(p.title);
       const description = normalizeText(p.description);
       const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-      const matchesQuery = title.includes(userQuery) || description.includes(userQuery);
+      const matchesQuery = userQuery.split(' ').some(word =>
+        title.includes(word) || description.includes(word)
+      );
       const withinBudget = !budget || price <= budget;
       return matchesQuery && withinBudget;
     });
