@@ -22,8 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // === Try Gemini ===
     if (GEMINI_API_KEY) {
-   const geminiResponse = await fetch(
-  'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+const geminiResponse = await fetch(
+  'https://generativelanguage.googleapis.com/v1/models/gemini-pro:streamGenerateContent',
   {
     method: 'POST',
     headers: {
