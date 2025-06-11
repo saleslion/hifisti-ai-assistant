@@ -14,12 +14,17 @@ export default function Home() {
     setMessages([...messages, userMsg]);
     setInput('');
 
-    const response = await axios.post('/api/gemini', {
-      message: input
-    });
+    try {
+      const response = await axios.post('/api/chat', {
+        message: input
+      });
 
-    const botMsg = { role: 'assistant', content: response.data.reply };
-    setMessages([...messages, userMsg, botMsg]);
+      const botMsg = { role: 'assistant', content: response.data.reply };
+      setMessages(prev => [...prev, botMsg]);
+    } catch (error) {
+      const errMsg = { role: 'assistant', content: 'Sorry, something went wrong.' };
+      setMessages(prev => [...prev, errMsg]);
+    }
   };
 
   return (
