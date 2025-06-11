@@ -135,18 +135,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchArticles(),
     ]);
 
-    const relevantProducts = products.filter((p) => {
-      const title = normalizeText(p.title);
-      const description = normalizeText(p.description);
+    let relevantProducts = products.filter((p) => {
+      const combinedText = normalizeText(p.title + ' ' + p.description);
       const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-      const matchesQuery = userQuery.split(' ').some(word =>
-        title.includes(word) || description.includes(word)
-      );
+      const matchesQuery = combinedText.includes(userQuery);
       const withinBudget = !budget || price <= budget;
       return matchesQuery && withinBudget;
     });
 
-    const formattedProducts = formatProducts(relevantProducts.length ? relevantProducts : products.slice(0, 5)); // fallback
+    // Fallback if no matches
+    if (relevantProducts.length === 0) {
+      relevantProducts = products.slice(0, 5);
+    }
+
+    const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
@@ -168,6 +170,8 @@ ${formattedArticles}
 👤 USER QUERY:
 "${latestUserMessage}"
 `;
+
+    console.log('🧠 Final AI Prompt:\n', prompt);
 
     const reply = await askGroq(prompt);
     res.status(200).json({ reply });
