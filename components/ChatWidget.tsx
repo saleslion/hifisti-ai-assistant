@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'; // ✅ Add this import for GFM (links, tables, etc.)
 
 type Message = {
   role: 'user' | 'assistant';
@@ -80,7 +81,21 @@ export default function ChatWidget() {
               }`}
             >
               <div className="prose prose-sm">
-                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ node, ...props }) => (
+                      <a
+                        {...props}
+                        className="text-blue-600 underline hover:text-blue-800"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    ),
+                  }}
+                >
+                  {msg.text}
+                </ReactMarkdown>
               </div>
             </div>
           ))}
