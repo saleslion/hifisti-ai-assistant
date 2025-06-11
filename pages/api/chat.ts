@@ -20,7 +20,14 @@ const fetchFromShopify = async (query: string) => {
   return json.data;
 };
 
-const fetchProducts = async (search: string) => {
+type ProductNode = {
+  title: string;
+  description: string;
+  images: { edges: { node: { url: string } }[] };
+  variants: { edges: { node: { price: { amount: string } } }[] };
+};
+
+const fetchProducts = async (search: string): Promise<ProductNode[]> => {
   const query = `
     {
       products(first: 12, query: "${search}") {
@@ -85,7 +92,7 @@ const askGroq = async (prompt: string) => {
   return json.choices?.[0]?.message?.content || 'No AI response.';
 };
 
-const formatProducts = (products: any[]) => {
+const formatProducts = (products: ProductNode[]) => {
   return products.map((p, idx) => {
     const title = p.title;
     const desc = p.description;
@@ -130,7 +137,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     const filteredProducts = budget
-      ? products.filter((p: any) => parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget)
+      ? products.filter((p) =>
+          parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget
+        )
       : products;
 
     const formattedProducts = formatProducts(filteredProducts);
