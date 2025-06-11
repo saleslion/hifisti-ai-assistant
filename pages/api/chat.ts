@@ -97,18 +97,18 @@ You already know:
 
 🎯 Your job:
 - Recommend the most relevant product(s) based on the user's current query.
-- Users may ask for speakers, turntables, headphones, amps, etc.
+- You have access to speakers, amplifiers, turntables, headphones, boomboxes, and accessories.
 - Always tailor suggestions to their budget and use case.
 - If the user wants Hi-Fi but is on a budget, explain realistic trade-offs.
 - NEVER suggest products more than 125% over budget unless they ask for premium options.
 
 ✅ Format:
-- Product name (as a clickable link)
+- Product name as a [clickable link](url)
 - One-sentence benefit
 - Price
-- Product image
+- Product image URL
 
-🧠 Be helpful, persuasive, and concise. Never repeat questions already answered. Always guide toward the next best decision.
+🧠 Be helpful, persuasive, and concise. Never repeat questions already answered. Guide them toward the next best decision.
 `.trim();
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -142,7 +142,7 @@ const formatProducts = (products: ProductNode[]) => {
     const price = p.variants.edges[0]?.node?.price?.amount || 'N/A';
     const image = p.images.edges[0]?.node?.url || '';
     const url = `https://${SHOPIFY_DOMAIN}/products/${p.handle}`;
-    return `🔹 **[${title}](${url})**\n${desc}.\n💰 €${price}\n🖼️ ${image}`;
+    return `🔹 [${title}](${url})\n${desc}.\n💰 €${price}\n🖼️ ${image}`;
   }).join('\n\n');
 };
 
