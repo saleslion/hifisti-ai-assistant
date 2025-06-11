@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm'; // ✅ Add this import for GFM (links, tables, etc.)
+import remarkGfm from 'remark-gfm'; // For GitHub-flavored markdown (like links)
 
 type Message = {
   role: 'user' | 'assistant';
@@ -69,7 +69,7 @@ export default function ChatWidget() {
           Hifisti AI Shopping Assistant
         </div>
 
-        {/* Message area */}
+        {/* Chat area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((msg, i) => (
             <div
@@ -80,25 +80,25 @@ export default function ChatWidget() {
                   : 'bg-gray-100 text-left'
               }`}
             >
-              <div className="prose prose-sm">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ node, ...props }) => (
-                      <a
-                        {...props}
-                        className="text-blue-600 underline hover:text-blue-800"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    ),
-                  }}
-                >
-                  {msg.text}
-                </ReactMarkdown>
-              </div>
+              <ReactMarkdown
+                className="prose prose-sm"
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ node, ...props }) => (
+                    <a
+                      {...props}
+                      className="text-blue-600 underline hover:text-blue-800"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  ),
+                }}
+              >
+                {msg.text}
+              </ReactMarkdown>
             </div>
           ))}
+
           {loading && (
             <div className="bg-gray-100 p-3 rounded-xl max-w-[75%]">
               Typing...
@@ -106,13 +106,13 @@ export default function ChatWidget() {
           )}
         </div>
 
-        {/* Input */}
+        {/* Input area */}
         <form onSubmit={handleSend} className="p-4 border-t flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask something..."
+            placeholder="Ask something like 'Best speakers for under €500'"
             className="flex-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={loading}
           />
