@@ -79,7 +79,9 @@ export default function ChatWidget() {
                   : 'bg-gray-100 text-left'
               }`}
             >
-              <ReactMarkdown className="prose prose-sm">{msg.text}</ReactMarkdown>
+              <div className="prose prose-sm">
+                <ReactMarkdown>{msg.text}</ReactMarkdown>
+              </div>
             </div>
           ))}
           {loading && (
