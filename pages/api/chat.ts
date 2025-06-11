@@ -23,6 +23,7 @@ const fetchFromShopify = async (query: string) => {
 type ProductNode = {
   title: string;
   description: string;
+  handle: string;
   images: { edges: { node: { url: string } }[] };
   variants: { edges: { node: { price: { amount: string } } }[] };
 };
@@ -34,6 +35,7 @@ const fetchProducts = async (): Promise<ProductNode[]> => {
         edges {
           node {
             title
+            handle
             description
             images(first: 1) {
               edges { node { url } }
@@ -88,7 +90,17 @@ const askGroq = async (prompt: string) => {
         {
           role: 'system',
           content:
-            'You are a helpful Shopify product advisor. Only recommend products from the list provided. If products match the user query or budget, suggest them clearly. Do not invent anything.',
+            `You are a sales-oriented Shopify product advisor for Hifisti.
+
+When a user expresses interest in a product category (e.g., speakers), do the following:
+1. Immediately recommend matching products from the catalog.
+2. Each product should include: name, short benefit, price, and clickable link (use the Shopify handle + store domain).
+3. Do not ask if the user wants suggestions — just show them.
+4. After listing products, ask natural follow-up questions like:
+   - "Are you using them for music, movies, or gaming?"
+   - "What budget range are you thinking of?"
+
+Avoid greetings and unnecessary prompts. Focus on conversion and clarity.`,
         },
         {
           role: 'user',
@@ -100,9 +112,8 @@ const askGroq = async (prompt: string) => {
 
   const json = await res.json();
 
-  // ✅ Safe fallback if Groq gives no reply
   if (!json?.choices?.[0]?.message?.content?.trim()) {
-    return "I found a few options for you below. Let me know if you'd like more details!";
+    return "Here are some options based on your request. Let me know what you'd like to explore further.";
   }
 
   return json.choices[0].message.content.trim();
@@ -111,10 +122,11 @@ const askGroq = async (prompt: string) => {
 const formatProducts = (products: ProductNode[]) => {
   return products.map((p) => {
     const title = p.title;
-    const desc = p.description;
+    const desc = p.description.split('. ')[0]; // Take first sentence
     const price = p.variants.edges[0]?.node?.price?.amount || 'N/A';
     const image = p.images.edges[0]?.node?.url || '';
-    return `🔹 **${title}**\n${desc}\n💰 €${price}\n🖼️ ${image}`;
+    const url = `https://${SHOPIFY_DOMAIN}/products/${p.handle}`;
+    return `🔹 **[${title}](${url})**\n${desc}.\n💰 €${price}\n🖼️ ${image}`;
   }).join('\n\n');
 };
 
@@ -174,26 +186,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
-🛍️ You are a smart AI product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
+MATCHING PRODUCTS:
 
-Only recommend products from the list below. Do not invent or assume features. If none match, say so clearly.
-
-${budget ? `💸 The customer budget is €${budget}. Recommend only within or near this.` : ''}
-
-==========================
-📦 PRODUCT CATALOG:
 ${formattedProducts}
 
 ==========================
-📝 BLOG ARTICLES:
+RELATED BLOG ARTICLES:
 ${formattedArticles}
 
-==========================
-👤 USER QUERY:
+USER QUERY:
 "${latestUserMessage}"
 `;
 
-    // ✅ Log prompt + product count
     console.log('🧠 Prompt Sent to Groq:\n', prompt);
     console.log('📦 Product Count:', relevantProducts.length);
 
