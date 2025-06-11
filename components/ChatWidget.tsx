@@ -17,7 +17,9 @@ export default function ChatWidget() {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: 'user', text: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+
+    setMessages(updatedMessages);
     setInput('');
     setLoading(true);
 
@@ -25,14 +27,21 @@ export default function ChatWidget() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMessage] }),
+        body: JSON.stringify({
+          messages: updatedMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.text,
+          })),
+        }),
       });
 
       const data = await response.json();
 
       const assistantMessage: Message = {
         role: 'assistant',
-        text: data.reply || 'Sorry, I didn’t catch that. Could you try again?',
+        text:
+          data.reply?.trim() ||
+          'Sorry, I didn’t catch that. Could you try again?',
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -40,7 +49,10 @@ export default function ChatWidget() {
       console.error('❌ Error calling chat API:', err);
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', text: 'Something went wrong. Please try again.' },
+        {
+          role: 'assistant',
+          text: 'Something went wrong. Please try again.',
+        },
       ]);
     } finally {
       setLoading(false);
