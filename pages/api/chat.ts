@@ -102,11 +102,15 @@ const formatArticles = (articles: any[]) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { message } = req.body;
-  if (!message || !Array.isArray(message)) return res.status(400).json({ error: 'Invalid message format' });
+  const { messages } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'Invalid message format' });
+  }
 
-  const latestUserMessage = message.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
-  if (!latestUserMessage) return res.status(400).json({ error: 'No user message found' });
+  const latestUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
+  if (!latestUserMessage) {
+    return res.status(400).json({ error: 'No valid user message found' });
+  }
 
   try {
     const [products, articles] = await Promise.all([
@@ -136,7 +140,7 @@ Now respond with helpful advice using only the info above. If no products match,
     `;
 
     const reply = await askGroq(prompt);
-    res.status(200).json({ response: reply });
+    res.status(200).json({ reply });
   } catch (err: any) {
     console.error('[SHOPIFY_AI_ERROR]', err);
     res.status(500).json({ error: err.message || 'Internal Server Error' });
