@@ -78,61 +78,43 @@ const fetchArticles = async () => {
   return data.articles.edges.map((edge: any) => edge.node);
 };
 
-const askGroq = async (
+const askGemini = async (
   prompt: string,
   context: { budget?: number; useCase?: string; location?: string }
 ) => {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('Missing GROQ_API_KEY in environment variables');
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Missing GEMINI_API_KEY in environment variables');
 
-  const { budget, useCase, location } = context;
-
-  const systemPrompt = `
-You are a smart, confident, and sales-focused audio product advisor for the Shopify store Hifisti.
-
-You already know:
-- Budget: ${budget ? `€${budget}` : 'not yet specified'}
-- Use case: ${useCase || 'not yet specified'}
-- Room type: ${location || 'not yet specified'}
-
-🎯 Your job:
-- Recommend the most relevant product(s) based on the user's current query.
-- You have access to speakers, amplifiers, turntables, headphones, boomboxes, and accessories.
-- Always tailor suggestions to their budget and use case.
-- If the user wants Hi-Fi but is on a budget, explain realistic trade-offs.
-- NEVER suggest products more than 125% over budget unless they ask for premium options.
-
-✅ Format:
-- Product name as a [clickable link](url)
-- One-sentence benefit
-- Price
-- Product image URL
-
-🧠 Be helpful, persuasive, and concise. Never repeat questions already answered. Guide them toward the next best decision.
-`.trim();
-
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama3-70b-8192',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
+  const messages = [
+    {
+      role: 'user',
+      parts: [
+        {
+          text: prompt,
+        },
       ],
-    }),
-  });
+    },
+  ];
+
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ contents: messages }),
+    }
+  );
 
   const json = await res.json();
 
-  if (!json?.choices?.[0]?.message?.content?.trim()) {
+  if (!json?.candidates?.[0]?.content?.parts?.[0]?.text) {
     return 'Here are some options based on what you’re looking for.';
   }
 
-  return json.choices[0].message.content.trim();
+  return json.candidates[0].content.parts[0].text.trim();
 };
 
 const formatProducts = (products: ProductNode[]) => {
@@ -243,10 +225,10 @@ USER QUERY:
 "${latestUserMessage}"
 `;
 
-    console.log('🧠 Prompt Sent to Groq:\n', prompt);
+    console.log('🧠 Prompt Sent to Gemini:\n', prompt);
     console.log('📦 Product Count:', relevantProducts.length);
 
-    const reply = await askGroq(prompt, {
+    const reply = await askGemini(prompt, {
       budget: budget ?? undefined,
       useCase,
       location,
