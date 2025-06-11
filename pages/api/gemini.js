@@ -1,9 +1,12 @@
+
 import axios from 'axios';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { message } = req.body;
+  console.log("MESSAGE:", message);
+
   const shopifyDomain = process.env.SHOPIFY_DOMAIN;
   const storefrontToken = process.env.SHOPIFY_STOREFRONT_TOKEN;
 
@@ -41,10 +44,12 @@ export default async function handler(req, res) {
       }
     );
 
+    console.log("Shopify response:", response.data);
+
     products = response.data.data.products.edges.map(edge => edge.node);
 
   } catch (err) {
-    console.error("Error fetching Storefront data:", err.message);
+    console.error("Shopify API error:", err.response?.data || err.message);
   }
 
   const prompt = `
@@ -55,6 +60,8 @@ ${JSON.stringify(products, null, 2)}
 
 User asked: "${message}"
 `;
+
+  console.log("Prompt to Gemini:", prompt);
 
   try {
     const geminiResponse = await axios.post(
@@ -70,7 +77,7 @@ User asked: "${message}"
     res.status(200).json({ reply });
 
   } catch (error) {
-    console.error('Gemini error:', error.message);
+    console.error('Gemini error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Gemini API error' });
   }
 }
