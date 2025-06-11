@@ -23,7 +23,7 @@ const fetchFromShopify = async (query: string) => {
 const fetchProducts = async (search: string) => {
   const query = `
     {
-      products(first: 8, query: "${search}") {
+      products(first: 12, query: "${search}") {
         edges {
           node {
             title
@@ -31,8 +31,12 @@ const fetchProducts = async (search: string) => {
             images(first: 1) {
               edges { node { url } }
             }
-            variants(first: 1) {
-              edges { node { price { amount } } }
+            variants(first: 5) {
+              edges {
+                node {
+                  price { amount }
+                }
+              }
             }
           }
         }
@@ -90,7 +94,7 @@ const formatProducts = (products: any[]) => {
     return `Product ${idx + 1}:
 - Title: ${title}
 - Description: ${desc}
-- Price: ₱${price}
+- Price: €${price}
 - Image: ${image}`;
   }).join('\n\n');
 };
@@ -101,12 +105,10 @@ const formatArticles = (articles: any[]) => {
   }).join('\n\n');
 };
 
-// ✅ Budget extractor
-function extractBudgetFromMessage(message: string): string | null {
-  const euroPattern = /(?:under|less than|up to)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i;
-  const match = message.match(euroPattern);
-  return match?.[1] || null;
-}
+const extractBudgetFromMessage = (message: string): number | null => {
+  const match = message.match(/(?:under|less than|up to)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i);
+  return match ? parseFloat(match[1]) : null;
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { messages } = req.body;
@@ -127,14 +129,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchArticles(),
     ]);
 
-    const formattedProducts = formatProducts(products);
+    const filteredProducts = budget
+      ? products.filter((p) => parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget)
+      : products;
+
+    const formattedProducts = formatProducts(filteredProducts);
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
-You are a product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
+You are a helpful, intelligent AI product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
+Your job is to assist customers by recommending products that fit their needs.
+ONLY use data from the product catalog and blog articles provided below.
 
-Your job is to recommend or guide users ONLY using the data from the store.
-${budget ? `The user has a budget of €${budget}. Only recommend products within this price range.\n` : ''}
+${budget ? `The customer has a budget of €${budget}. Only suggest products below or close to this price.` : ''}
 
 PRODUCTS:
 ${formattedProducts || 'No products found.'}
@@ -145,8 +152,8 @@ ${formattedArticles || 'No articles available.'}
 The user said:
 "${latestUserMessage}"
 
-Now respond with helpful advice using only the info above. If no products match, say so.
-    `;
+Respond in a natural, engaging tone using only the data above. Do not invent or assume anything not included.
+If nothing is relevant, say so in a helpful way.`;
 
     const reply = await askGroq(prompt);
     res.status(200).json({ reply });
