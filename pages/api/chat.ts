@@ -38,7 +38,7 @@ const fetchProducts = async (): Promise<ProductNode[]> => {
             images(first: 1) {
               edges { node { url } }
             }
-            variants(first: 5) {
+            variants(first: 1) {
               edges {
                 node {
                   price { amount }
@@ -89,11 +89,11 @@ const askGroq = async (prompt: string) => {
   });
 
   const json = await res.json();
-  return json.choices?.[0]?.message?.content || 'No AI response.';
+  return json?.choices?.[0]?.message?.content?.trim() || 'Sorry, I couldn’t find anything that matches your request right now.';
 };
 
 const formatProducts = (products: ProductNode[]) => {
-  return products.map((p, idx) => {
+  return products.map((p) => {
     const title = p.title;
     const desc = p.description;
     const price = p.variants.edges[0]?.node?.price?.amount || 'N/A';
@@ -116,20 +116,20 @@ const extractBudgetFromMessage = (message: string): number | null => {
 const normalizeText = (text: string) => text.toLowerCase().replace(/[^\w\s]/gi, '');
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { messages } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'Invalid message format' });
-  }
-
-  const latestUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
-  if (!latestUserMessage) {
-    return res.status(400).json({ error: 'No valid user message found' });
-  }
-
-  const budget = extractBudgetFromMessage(latestUserMessage);
-  const userQuery = normalizeText(latestUserMessage);
-
   try {
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Invalid message format' });
+    }
+
+    const latestUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
+    if (!latestUserMessage) {
+      return res.status(400).json({ error: 'No valid user message found' });
+    }
+
+    const budget = extractBudgetFromMessage(latestUserMessage);
+    const userQuery = normalizeText(latestUserMessage);
+
     const [products, articles] = await Promise.all([
       fetchProducts(),
       fetchArticles(),
@@ -146,30 +146,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return matchesQuery && withinBudget;
     });
 
-    const formattedProducts = formatProducts(relevantProducts);
+    const formattedProducts = formatProducts(relevantProducts.length ? relevantProducts : products.slice(0, 5)); // fallback
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
 🛍️ You are a smart AI product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
 
-Your goal is to recommend products ONLY using the data below from the store.
+Only recommend products from the list below. Do not invent or assume features. If none match, say so clearly.
 
-${budget ? `💸 The customer has a budget of €${budget}. Only suggest products near or below this amount.` : ''}
+${budget ? `💸 The customer budget is €${budget}. Recommend only within or near this.` : ''}
 
 ==========================
 📦 PRODUCT CATALOG:
-${formattedProducts || 'No products found.'}
+${formattedProducts}
 
 ==========================
 📝 BLOG ARTICLES:
-${formattedArticles || 'No articles available.'}
+${formattedArticles}
 
 ==========================
-👤 USER INPUT:
+👤 USER QUERY:
 "${latestUserMessage}"
-
-Please reply with helpful, accurate suggestions ONLY based on the above data. Do not assume anything not explicitly given.
-If no product matches, say so in a helpful way.
 `;
 
     const reply = await askGroq(prompt);
