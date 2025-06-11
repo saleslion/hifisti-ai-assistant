@@ -130,7 +130,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     const filteredProducts = budget
-      ? products.filter((p) => parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget)
+      ? products.filter((p: any) => parseFloat(p.variants.edges[0]?.node?.price?.amount || '0') <= budget)
       : products;
 
     const formattedProducts = formatProducts(filteredProducts);
