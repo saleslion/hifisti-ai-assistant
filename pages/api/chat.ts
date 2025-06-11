@@ -22,24 +22,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // === Try Gemini ===
     if (GEMINI_API_KEY) {
-      const geminiResponse = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+   const geminiResponse = await fetch(
+  'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      contents: [
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: messages.map((m: any) => m.content).join('\n') }],
-              },
-            ],
-          }),
-        }
-      );
+          role: 'user',
+          parts: [{ text: messages.map((m: any) => m.content).join('\n') }],
+        },
+      ],
+    }),
+  }
+);
 
       const geminiData = await geminiResponse.json();
       console.log('[Gemini response]', JSON.stringify(geminiData));
