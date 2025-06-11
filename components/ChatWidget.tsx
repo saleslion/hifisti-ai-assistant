@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -78,7 +79,7 @@ export default function ChatWidget() {
                   : 'bg-gray-100 text-left'
               }`}
             >
-              {msg.text}
+              <ReactMarkdown className="prose prose-sm">{msg.text}</ReactMarkdown>
             </div>
           ))}
           {loading && (
