@@ -103,7 +103,10 @@ const formatArticles = (articles: any[]) => {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { message } = req.body;
-  if (!message) return res.status(400).json({ error: 'Missing message' });
+  if (!message || !Array.isArray(message)) return res.status(400).json({ error: 'Invalid message format' });
+
+  const latestUserMessage = message.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
+  if (!latestUserMessage) return res.status(400).json({ error: 'No user message found' });
 
   try {
     const [products, articles] = await Promise.all([
