@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ChatCompletionRequestMessage, Groq } from 'groq-sdk';
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { Groq } from 'groq-sdk';
+// Removed type-only import to support plain JS
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY || '',
