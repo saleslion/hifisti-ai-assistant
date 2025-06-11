@@ -11,19 +11,20 @@ export default function Home() {
     if (!input) return;
 
     const userMsg = { role: 'user', content: input };
-    setMessages([...messages, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput('');
 
     try {
       const response = await axios.post('/api/chat', {
-        message: input
+        history: updatedMessages
       });
 
       const botMsg = { role: 'assistant', content: response.data.reply };
-      setMessages(prev => [...prev, botMsg]);
+      setMessages([...updatedMessages, botMsg]);
     } catch (error) {
       const errMsg = { role: 'assistant', content: 'Sorry, something went wrong.' };
-      setMessages(prev => [...prev, errMsg]);
+      setMessages([...updatedMessages, errMsg]);
     }
   };
 

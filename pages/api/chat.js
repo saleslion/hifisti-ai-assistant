@@ -43,7 +43,7 @@ async function fetchShopifyProducts(domain, token) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { message } = req.body;
+  const { history } = req.body;
   const shopifyDomain = process.env.SHOPIFY_DOMAIN;
   const storefrontToken = process.env.SHOPIFY_STOREFRONT_TOKEN;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -53,13 +53,17 @@ export default async function handler(req, res) {
 
   const products = await fetchShopifyProducts(shopifyDomain, storefrontToken);
 
-  const prompt = `
+  
+    const chatHistory = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+
+    const prompt = `
+
 You are an AI shopping assistant for Hifisti.
 
 Here are some products:
 ${JSON.stringify(products, null, 2)}
 
-User asked: "${message}"
+Here is the conversation so far:\n${chatHistory}\nContinue the conversation based on the user's last message.
 `;
 
   // Try Gemini first
