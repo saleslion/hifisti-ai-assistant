@@ -10,13 +10,6 @@ async function fetchShopifyProducts(domain, token) {
           title
           description
           handle
-          images(first: 1) {
-            edges {
-              node {
-                url
-              }
-            }
-          }
         }
       }
     }
@@ -50,6 +43,11 @@ export default async function handler(req, res) {
   const groqKey = process.env.GROQ_API_KEY;
 
   const products = await fetchShopifyProducts(shopifyDomain, storefrontToken);
+  const shortProducts = products.map(p => ({
+    title: p.title,
+    description: p.description,
+    handle: p.handle
+  }));
 
   const chatHistory = history.map(msg =>
     `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
@@ -58,8 +56,8 @@ export default async function handler(req, res) {
   const prompt = `
 You are an AI shopping assistant for Hifisti.
 
-Here are some products:
-${JSON.stringify(products, null, 2)}
+Here are some featured products:
+${JSON.stringify(shortProducts, null, 2)}
 
 Here is the conversation so far:
 ${chatHistory}
@@ -109,6 +107,8 @@ Continue the conversation based on the user's last message.
   } catch (error) {
     const errMessage = error.response?.data?.error?.message || error.message;
     console.error("Groq failed:", errMessage);
-    return res.status(500).json({ reply: "Sorry, all AI services are currently busy. Please try again in a few seconds." });
+    return res.status(503).json({
+      reply: "Our AI assistant is currently handling a high volume of requests. Please try again in about 20 seconds. We appreciate your patience!"
+    });
   }
 }
