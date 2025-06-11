@@ -80,22 +80,23 @@ export default function ChatWidget() {
                   : 'bg-gray-100 text-left'
               }`}
             >
-              <ReactMarkdown
-                className="prose prose-sm"
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  a: ({ node, ...props }) => (
-                    <a
-                      {...props}
-                      className="text-blue-600 underline hover:text-blue-800"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    />
-                  ),
-                }}
-              >
-                {msg.text}
-              </ReactMarkdown>
+              <div className="prose prose-sm">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ node, ...props }) => (
+                      <a
+                        {...props}
+                        className="text-blue-600 underline hover:text-blue-800"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    ),
+                  }}
+                >
+                  {msg.text}
+                </ReactMarkdown>
+              </div>
             </div>
           ))}
 
