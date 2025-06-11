@@ -84,12 +84,28 @@ const askGroq = async (prompt: string) => {
     },
     body: JSON.stringify({
       model: 'llama3-70b-8192',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a helpful Shopify product advisor. Only recommend products from the list provided. If products match the user query or budget, suggest them clearly. Do not invent anything.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
     }),
   });
 
   const json = await res.json();
-  return json?.choices?.[0]?.message?.content?.trim() || 'Sorry, I couldn’t find anything that matches your request right now.';
+
+  // ✅ Safe fallback if Groq gives no reply
+  if (!json?.choices?.[0]?.message?.content?.trim()) {
+    return "I found a few options for you below. Let me know if you'd like more details!";
+  }
+
+  return json.choices[0].message.content.trim();
 };
 
 const formatProducts = (products: ProductNode[]) => {
@@ -135,27 +151,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchArticles(),
     ]);
 
-let relevantProducts = products.filter((p) => {
-  const combinedText = normalizeText(p.title + ' ' + p.description);
-  const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-  const matchesQuery = combinedText.includes(userQuery);
-  const withinBudget = !budget || price <= budget;
-  return matchesQuery && withinBudget;
-});
+    let relevantProducts = products.filter((p) => {
+      const combinedText = normalizeText(p.title + ' ' + p.description);
+      const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
+      const matchesQuery = combinedText.includes(userQuery);
+      const withinBudget = !budget || price <= budget;
+      return matchesQuery && withinBudget;
+    });
 
-// If no products matched both query and budget, retry with query match only
-if (relevantProducts.length === 0 && userQuery) {
-  relevantProducts = products.filter((p) => {
-    const combinedText = normalizeText(p.title + ' ' + p.description);
-    return combinedText.includes(userQuery);
-  });
-}
+    if (relevantProducts.length === 0 && userQuery) {
+      relevantProducts = products.filter((p) => {
+        const combinedText = normalizeText(p.title + ' ' + p.description);
+        return combinedText.includes(userQuery);
+      });
+    }
 
-// Final fallback if still empty
-if (relevantProducts.length === 0) {
-  relevantProducts = products.slice(0, 5);
-}
-
+    if (relevantProducts.length === 0) {
+      relevantProducts = products.slice(0, 5);
+    }
 
     const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
@@ -180,7 +193,9 @@ ${formattedArticles}
 "${latestUserMessage}"
 `;
 
-    console.log('🧠 Final AI Prompt:\n', prompt);
+    // ✅ Log prompt + product count
+    console.log('🧠 Prompt Sent to Groq:\n', prompt);
+    console.log('📦 Product Count:', relevantProducts.length);
 
     const reply = await askGroq(prompt);
     res.status(200).json({ reply });
