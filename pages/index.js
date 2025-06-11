@@ -1,53 +1,63 @@
-
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
-import { useState } from 'react';
 import axios from 'axios';
+import '../styles/global.css';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const chatBoxRef = useRef(null);
 
   const sendMessage = async () => {
-    if (!input) return;
-
+    if (!input.trim()) return;
     const userMsg = { role: 'user', content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput('');
+    setLoading(true);
 
     try {
-      const response = await axios.post('/api/chat', {
-        history: updatedMessages
-      });
-
+      const response = await axios.post('/api/chat', { history: updatedMessages });
       const botMsg = { role: 'assistant', content: response.data.reply };
       setMessages([...updatedMessages, botMsg]);
-    } catch (error) {
+    } catch {
       const errMsg = { role: 'assistant', content: 'Sorry, something went wrong.' };
       setMessages([...updatedMessages, errMsg]);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    chatBoxRef.current?.scrollTo({ top: chatBoxRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages]);
 
   return (
     <>
       <Head>
-        <title>Hifisti AI Assistant</title>
+        <title>Hifisti Shopping Assistant</title>
       </Head>
-      <div id="chat-widget">
-        <div id="chat-box">
+      <div className="app-container">
+        <header className="app-header">🛍️ Hifisti AI Assistant</header>
+        <div className="chat-box" ref={chatBoxRef}>
           {messages.map((msg, idx) => (
-            <div key={idx} className="message">
-              <strong>{msg.role === 'user' ? 'You' : 'Assistant'}:</strong> {msg.content}
+            <div key={idx} className={`message ${msg.role}`}>
+              {msg.content}
             </div>
           ))}
+          {loading && <div className="message assistant">Thinking...</div>}
         </div>
-        <input
-          id="chat-input"
-          placeholder="Ask me anything..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
+        <div className="input-area">
+          <input
+            type="text"
+            placeholder="Ask me anything..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          />
+          <button onClick={sendMessage}>Send</button>
+        </div>
       </div>
     </>
   );
