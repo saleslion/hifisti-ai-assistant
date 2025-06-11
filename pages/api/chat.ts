@@ -31,49 +31,37 @@ type ProductNode = {
 };
 
 const fetchProducts = async (): Promise<ProductNode[]> => {
-  const query = `
-    {
-      products(first: 50) {
-        edges {
-          node {
-            title
-            handle
-            description
-            productType
-            tags
-            images(first: 1) {
-              edges { node { url } }
-            }
-            variants(first: 1) {
-              edges {
-                node {
-                  price { amount }
-                }
-              }
-            }
-          }
+  const query = `{
+    products(first: 50) {
+      edges {
+        node {
+          title
+          handle
+          description
+          productType
+          tags
+          images(first: 1) { edges { node { url } } }
+          variants(first: 1) { edges { node { price { amount } } } }
         }
       }
     }
-  `;
+  }`;
   const data = await fetchFromShopify(query);
   return data.products.edges.map((edge: any) => edge.node);
 };
 
 const fetchArticles = async () => {
-  const query = `
-    {
-      articles(first: 5) {
-        edges {
-          node {
-            title
-            excerpt
-            contentHtml
-          }
+  const query = `{
+    articles(first: 5) {
+      edges {
+        node {
+          title
+          excerpt
+          contentHtml
         }
       }
     }
-  `;
+  }`;
   const data = await fetchFromShopify(query);
   return data.articles.edges.map((edge: any) => edge.node);
 };
@@ -90,7 +78,31 @@ const askGemini = async (
       role: 'user',
       parts: [
         {
-          text: prompt,
+          text: `
+You are an expert product advisor for an audio equipment store.
+
+Your job is to:
+- Recommend products that match the user's request using the provided Shopify product catalog.
+- Prioritize product matches by title, tags, and productType (e.g., "turntables", "speakers", "amps").
+- Use budget, use case, and room info if available.
+- Suggest exactly 3-5 matching products in this format:
+
+🔊 [Product Title](product_link)
+Short 1-line benefit.
+💰 €Price
+🖼️ Image URL
+
+Then suggest 1 blog article if relevant.
+
+CATALOG:
+${context.catalog}
+
+ARTICLES:
+${context.articles}
+
+USER MESSAGE:
+${prompt}
+`.trim(),
         },
       ],
     },
@@ -129,9 +141,7 @@ const formatProducts = (products: ProductNode[]) => {
 };
 
 const formatArticles = (articles: any[]) => {
-  return articles.map((a) => {
-    return `📝 **${a.title}**\n${a.excerpt || a.contentHtml.slice(0, 200)}`;
-  }).join('\n\n');
+  return articles.map((a) => `📝 **${a.title}**\n${a.excerpt || a.contentHtml.slice(0, 200)}`).join('\n\n');
 };
 
 const extractBudgetFromMessage = (message: string): number | null => {
@@ -212,26 +222,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
 
-    const prompt = `
-MATCHING PRODUCTS:
-
-${formattedProducts}
-
-==========================
-RELATED BLOG ARTICLES:
-${formattedArticles}
-
-USER QUERY:
-"${latestUserMessage}"
-`;
-
-    console.log('🧠 Prompt Sent to Gemini:\n', prompt);
+    console.log('🧠 Prompt Sent to Gemini:', latestUserMessage);
     console.log('📦 Product Count:', relevantProducts.length);
 
-    const reply = await askGemini(prompt, {
-      budget: budget ?? undefined,
+    const reply = await askGemini(latestUserMessage, {
+      budget,
       useCase,
       location,
+      catalog: formattedProducts,
+      articles: formattedArticles,
     });
 
     res.status(200).json({ reply });
