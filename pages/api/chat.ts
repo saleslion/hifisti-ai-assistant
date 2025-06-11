@@ -74,14 +74,28 @@ const fetchArticles = async () => {
   return data.articles.edges.map((edge: any) => edge.node);
 };
 
-const askGroq = async (prompt: string) => {
+const askGroq = async (
+  prompt: string,
+  context: { budget?: number; useCase?: string; location?: string }
+) => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('Missing GROQ_API_KEY in environment variables');
+
+  const { budget, useCase, location } = context;
+
+  const followUps = [];
+  if (!useCase) followUps.push('Will these be used for music, movies, or gaming?');
+  if (!budget) followUps.push('Do you have a budget range in mind?');
+  if (!location) followUps.push('Are these for a bedroom, living room, or a larger space?');
+
+  const followUpText = followUps.length
+    ? `After showing products, ask:\n- ${followUps.join('\n- ')}`
+    : '';
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -89,18 +103,19 @@ const askGroq = async (prompt: string) => {
       messages: [
         {
           role: 'system',
-          content:
-            `You are a sales-oriented Shopify product advisor for Hifisti.
+          content: `
+You are a sales-focused product advisor for the Shopify store Hifisti.
 
-When a user expresses interest in a product category (e.g., speakers), do the following:
-1. Immediately recommend matching products from the catalog.
-2. Each product should include: name, short benefit, price, and clickable link (use the Shopify handle + store domain).
-3. Do not ask if the user wants suggestions — just show them.
-4. After listing products, ask natural follow-up questions like:
-   - "Are you using them for music, movies, or gaming?"
-   - "What budget range are you thinking of?"
+Always start by recommending matching products (no greetings). Each should include:
+- Name (as a clickable link)
+- One-sentence benefit
+- Price
+- Product image
 
-Avoid greetings and unnecessary prompts. Focus on conversion and clarity.`,
+Never repeat questions already answered in the user query. Keep your tone helpful, smart, and focused on closing the sale.
+
+${followUpText}
+        `.trim(),
         },
         {
           role: 'user',
@@ -113,7 +128,7 @@ Avoid greetings and unnecessary prompts. Focus on conversion and clarity.`,
   const json = await res.json();
 
   if (!json?.choices?.[0]?.message?.content?.trim()) {
-    return "Here are some options based on your request. Let me know what you'd like to explore further.";
+    return 'Here are some options based on what you’re looking for.';
   }
 
   return json.choices[0].message.content.trim();
@@ -122,7 +137,7 @@ Avoid greetings and unnecessary prompts. Focus on conversion and clarity.`,
 const formatProducts = (products: ProductNode[]) => {
   return products.map((p) => {
     const title = p.title;
-    const desc = p.description.split('. ')[0]; // Take first sentence
+    const desc = p.description.split('. ')[0];
     const price = p.variants.edges[0]?.node?.price?.amount || 'N/A';
     const image = p.images.edges[0]?.node?.url || '';
     const url = `https://${SHOPIFY_DOMAIN}/products/${p.handle}`;
@@ -137,8 +152,20 @@ const formatArticles = (articles: any[]) => {
 };
 
 const extractBudgetFromMessage = (message: string): number | null => {
-  const match = message.match(/(?:under|less than|up to)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i);
+  const match = message.match(
+    /(?:under|less than|up to|maximum|max)?\s*€?\s?(\d{2,5})(?:\s?(?:euros?|euro))?/i
+  );
   return match ? parseFloat(match[1]) : null;
+};
+
+const extractUseCase = (message: string): string | undefined => {
+  const match = message.match(/\b(music|movies?|gaming)\b/i);
+  return match ? match[1].toLowerCase() : undefined;
+};
+
+const extractLocation = (message: string): string | undefined => {
+  const match = message.match(/\b(room|living\s?room|studio|bedroom|office)\b/i);
+  return match ? match[1].toLowerCase() : undefined;
 };
 
 const normalizeText = (text: string) => text.toLowerCase().replace(/[^\w\s]/gi, '');
@@ -150,18 +177,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid message format' });
     }
 
-    const latestUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0]?.content;
+    const latestUserMessage = messages
+      .filter((m: any) => m.role === 'user')
+      .slice(-1)[0]?.content;
+
     if (!latestUserMessage) {
       return res.status(400).json({ error: 'No valid user message found' });
     }
 
     const budget = extractBudgetFromMessage(latestUserMessage);
+    const useCase = extractUseCase(latestUserMessage);
+    const location = extractLocation(latestUserMessage);
     const userQuery = normalizeText(latestUserMessage);
 
-    const [products, articles] = await Promise.all([
-      fetchProducts(),
-      fetchArticles(),
-    ]);
+    const [products, articles] = await Promise.all([fetchProducts(), fetchArticles()]);
 
     let relevantProducts = products.filter((p) => {
       const combinedText = normalizeText(p.title + ' ' + p.description);
@@ -201,7 +230,7 @@ USER QUERY:
     console.log('🧠 Prompt Sent to Groq:\n', prompt);
     console.log('📦 Product Count:', relevantProducts.length);
 
-    const reply = await askGroq(prompt);
+    const reply = await askGroq(prompt, { budget, useCase, location });
     res.status(200).json({ reply });
   } catch (err: any) {
     console.error('[SHOPIFY_AI_ERROR]', err);
