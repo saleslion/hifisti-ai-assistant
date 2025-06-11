@@ -203,11 +203,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userQuery = normalizeText(latestUserMessage);
     const [products, articles] = await Promise.all([fetchProducts(), fetchArticles()]);
 
-    // ✅ Only budget filter — let Groq decide relevance (e.g., speakers, turntables)
-    const relevantProducts = products.filter((p) => {
+    // ✅ Match keywords + budget filter, limit to top 10
+    let relevantProducts = products.filter((p) => {
+      const text = normalizeText(p.title + ' ' + p.description);
+      const keywords = userQuery.split(' ');
+      const matchesQuery = keywords.some(word => text.includes(word));
       const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-      return !budget || price <= budget * 1.25;
-    });
+      const withinBudget = !budget || price <= budget * 1.25;
+      return matchesQuery && withinBudget;
+    }).slice(0, 10);
+
+    // Fallback if nothing matches query
+    if (relevantProducts.length === 0) {
+      relevantProducts = products.slice(0, 5);
+    }
 
     const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
