@@ -49,24 +49,25 @@ export default async function handler(req, res) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
 
-  console.log("Incoming message:", message);
-
   const products = await fetchShopifyProducts(shopifyDomain, storefrontToken);
 
-  
-    const chatHistory = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+  const chatHistory = history.map(msg =>
+    `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+  ).join('\n');
 
-    const prompt = `
-
+  const prompt = `
 You are an AI shopping assistant for Hifisti.
 
 Here are some products:
 ${JSON.stringify(products, null, 2)}
 
-Here is the conversation so far:\n${chatHistory}\nContinue the conversation based on the user's last message.
+Here is the conversation so far:
+${chatHistory}
+
+Continue the conversation based on the user's last message.
 `;
 
-  // Try Gemini first
+  // Try Gemini
   try {
     const geminiResponse = await axios.post(
       'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=' + geminiKey,
@@ -77,28 +78,22 @@ Here is the conversation so far:\n${chatHistory}\nContinue the conversation base
         }]
       }
     );
+
     const reply = geminiResponse.data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I couldn’t find an answer.';
-    console.log("Gemini succeeded");
     return res.status(200).json({ reply });
   } catch (error) {
     console.error("Gemini failed:", error.response?.data || error.message);
   }
 
-  // Fall back to Groq (Mixtral)
+  // Try Groq
   try {
     const groqResponse = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
         model: 'llama3-70b-8192',
         messages: [
-          {
-            role: 'system',
-            content: 'You are an expert AI shopping assistant for a Shopify store.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
+          { role: 'system', content: 'You are an expert AI shopping assistant for a Shopify store.' },
+          { role: 'user', content: prompt }
         ]
       },
       {
@@ -110,10 +105,10 @@ Here is the conversation so far:\n${chatHistory}\nContinue the conversation base
     );
 
     const reply = groqResponse.data.choices?.[0]?.message?.content || 'Sorry, Groq could not generate a reply.';
-    console.log("Groq fallback succeeded");
     return res.status(200).json({ reply });
   } catch (error) {
-    console.error("Groq failed:", error.response?.data || error.message);
-    return res.status(500).json({ error: 'Both Gemini and Groq failed to generate a response.' });
+    const errMessage = error.response?.data?.error?.message || error.message;
+    console.error("Groq failed:", errMessage);
+    return res.status(500).json({ reply: "Sorry, all AI services are currently busy. Please try again in a few seconds." });
   }
 }
