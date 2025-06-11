@@ -1,8 +1,8 @@
 // pages/api/chat.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const SHOPIFY_DOMAIN = 'hifisti.myshopify.com';
+const STOREFRONT_API_KEY = process.env.SHOPIFY_STOREFRONT_API_KEY;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -10,87 +10,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { messages } = req.body;
+    const { searchTerm } = req.body;
 
-    console.log('[DEBUG] GEMINI_API_KEY:', !!GEMINI_API_KEY);
-    console.log('[DEBUG] GROQ_API_KEY:', !!GROQ_API_KEY);
-    console.log('[DEBUG] Incoming messages:', JSON.stringify(messages));
-
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Invalid messages payload' });
+    if (!STOREFRONT_API_KEY) {
+      throw new Error('Missing SHOPIFY_STOREFRONT_API_KEY in environment variables');
     }
 
-    // === Try Gemini ===
-    if (GEMINI_API_KEY) {
-const geminiResponse = await fetch(
-  'https://generativelanguage.googleapis.com/v1/models/gemini-pro:streamGenerateContent',
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY,
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: messages.map((m: any) => m.content).join('\n') }],
-        },
-      ],
-    }),
-  }
-);
+    if (!searchTerm || typeof searchTerm !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid searchTerm in request body' });
+    }
 
-      const geminiData = await geminiResponse.json();
-      console.log('[Gemini response]', JSON.stringify(geminiData));
-
-      const geminiReply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (geminiReply) {
-        return res.status(200).json({ reply: geminiReply });
-      } else if (geminiData?.error?.message) {
-        return res.status(200).json({
-          reply: `Gemini Error: ${geminiData.error.message}`,
-        });
+    const query = `
+      query GetProducts($query: String!) {
+        products(first: 5, query: $query) {
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              images(first: 1) {
+                edges {
+                  node {
+                    url
+                    altText
+                  }
+                }
+              }
+              variants(first: 1) {
+                edges {
+                  node {
+                    price {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    }
+    `;
 
-    // === Try Groq Fallback ===
-    if (GROQ_API_KEY) {
-  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${GROQ_API_KEY}`,
-  },
-  body: JSON.stringify({
-    model: 'llama3-70b-8192',
-    messages,
-  }),
-});
-
-
-      const groqData = await groqResponse.json();
-      console.log('[Groq response]', JSON.stringify(groqData));
-
-      const groqReply = groqData?.choices?.[0]?.message?.content;
-
-      if (groqReply) {
-        return res.status(200).json({ reply: groqReply });
-      } else if (groqData?.error?.message) {
-        return res.status(200).json({
-          reply: `Groq Error: ${groqData.error.message}`,
-        });
-      }
-    }
-
-    return res.status(200).json({
-      reply: "AI services are temporarily unavailable. Please try again soon.",
+    const shopifyRes = await fetch(`https://${SHOPIFY_DOMAIN}/api/2024-04/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Storefront-Access-Token': STOREFRONT_API_KEY,
+      },
+      body: JSON.stringify({
+        query,
+        variables: { query: searchTerm },
+      }),
     });
+
+    const json = await shopifyRes.json();
+
+    if (json.errors) {
+      console.error('[Shopify Errors]', JSON.stringify(json.errors));
+      return res.status(500).json({ error: 'Shopify API error', details: json.errors });
+    }
+
+    const products = json.data.products.edges.map((edge: any) => {
+      const p = edge.node;
+      return {
+        id: p.id,
+        title: p.title,
+        handle: p.handle,
+        description: p.description,
+        image: p.images.edges[0]?.node.url || null,
+        imageAlt: p.images.edges[0]?.node.altText || '',
+        price: p.variants.edges[0]?.node.price.amount || null,
+        currency: p.variants.edges[0]?.node.price.currencyCode || null,
+      };
+    });
+
+    return res.status(200).json({ products });
   } catch (err: any) {
-    console.error('[API_CHAT_ERROR]', err.message || err, err.stack);
-    return res.status(200).json({
-      reply: "Unexpected error occurred. Please try again later.",
-    });
+    console.error('[SHOPIFY_API_ERROR]', err.message || err, err.stack);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
