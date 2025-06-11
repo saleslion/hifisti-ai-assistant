@@ -1,1 +1,1 @@
-// Placeholder content for next.config.js
+module.exports = { reactStrictMode: true };
