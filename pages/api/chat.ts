@@ -135,18 +135,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchArticles(),
     ]);
 
-    let relevantProducts = products.filter((p) => {
-      const combinedText = normalizeText(p.title + ' ' + p.description);
-      const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
-      const matchesQuery = combinedText.includes(userQuery);
-      const withinBudget = !budget || price <= budget;
-      return matchesQuery && withinBudget;
-    });
+let relevantProducts = products.filter((p) => {
+  const combinedText = normalizeText(p.title + ' ' + p.description);
+  const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
+  const matchesQuery = combinedText.includes(userQuery);
+  const withinBudget = !budget || price <= budget;
+  return matchesQuery && withinBudget;
+});
 
-    // Fallback if no matches
-    if (relevantProducts.length === 0) {
-      relevantProducts = products.slice(0, 5);
-    }
+// If no products matched both query and budget, retry with query match only
+if (relevantProducts.length === 0 && userQuery) {
+  relevantProducts = products.filter((p) => {
+    const combinedText = normalizeText(p.title + ' ' + p.description);
+    return combinedText.includes(userQuery);
+  });
+}
+
+// Final fallback if still empty
+if (relevantProducts.length === 0) {
+  relevantProducts = products.slice(0, 5);
+}
+
 
     const formattedProducts = formatProducts(relevantProducts);
     const formattedArticles = formatArticles(articles);
