@@ -98,17 +98,13 @@ const formatProducts = (products: ProductNode[]) => {
     const desc = p.description;
     const price = p.variants.edges[0]?.node?.price?.amount || 'N/A';
     const image = p.images.edges[0]?.node?.url || '';
-    return `Product ${idx + 1}:
-- Title: ${title}
-- Description: ${desc}
-- Price: €${price}
-- Image: ${image}`;
+    return `🔹 **${title}**\n${desc}\n💰 €${price}\n🖼️ ${image}`;
   }).join('\n\n');
 };
 
 const formatArticles = (articles: any[]) => {
   return articles.map((a, idx) => {
-    return `Article ${idx + 1}: ${a.title}\nExcerpt: ${a.excerpt || a.contentHtml.slice(0, 200)}`;
+    return `📝 **${a.title}**\n${a.excerpt || a.contentHtml.slice(0, 200)}`;
   }).join('\n\n');
 };
 
@@ -146,23 +142,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const formattedArticles = formatArticles(articles);
 
     const prompt = `
-You are a helpful, intelligent AI product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
-Your job is to assist customers by recommending products that fit their needs.
-ONLY use data from the product catalog and blog articles provided below.
+🛍️ You are a smart AI product advisor for the Shopify store https://${SHOPIFY_DOMAIN}.
 
-${budget ? `The customer has a budget of €${budget}. Only suggest products below or close to this price.` : ''}
+Your goal is to recommend products ONLY using the data below from the store.
 
-PRODUCTS:
+${budget ? `💸 The customer has a budget of €${budget}. Only suggest products near or below this amount.` : ''}
+
+==========================
+📦 PRODUCT CATALOG:
 ${formattedProducts || 'No products found.'}
 
-ARTICLES:
+==========================
+📝 BLOG ARTICLES:
 ${formattedArticles || 'No articles available.'}
 
-The user said:
+==========================
+👤 USER INPUT:
 "${latestUserMessage}"
 
-Respond in a natural, engaging tone using only the data above. Do not invent or assume anything not included.
-If nothing is relevant, say so in a helpful way.`;
+Please reply with helpful, accurate suggestions ONLY based on the above data. If no product matches, say so. Do not assume anything not explicitly given.
+`;
 
     const reply = await askGroq(prompt);
     res.status(200).json({ reply });
