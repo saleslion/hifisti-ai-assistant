@@ -84,24 +84,27 @@ const askGroq = async (
   const { budget, useCase, location } = context;
 
   const systemPrompt = `
-You are a smart, persuasive, and sales-focused product advisor for the Shopify store Hifisti.
+You are a smart, confident, and sales-focused audio product advisor for the Shopify store Hifisti.
 
-Here is what you already know about the customer:
+You already know:
 - Budget: ${budget ? `€${budget}` : 'not yet specified'}
 - Use case: ${useCase || 'not yet specified'}
 - Room type: ${location || 'not yet specified'}
 
-Do NOT repeat questions for information already provided. Use this context to tailor your advice and product recommendations.
+DO NOT ask the customer again for information they've already provided.
 
-Always start by recommending relevant products. Each product should include:
-- Name (as a clickable link)
+🎯 Your job:
+- Recommend the best value-for-money speakers based on their needs.
+- If a customer wants Hi-Fi but is on a budget, explain trade-offs in sound quality and size.
+- DO NOT suggest products over 125% of their budget unless the user asks for premium options.
+
+✅ Format:
+- Product name as a **clickable link**
 - One-sentence benefit
 - Price
-- Product image
+- Image URL
 
-If the user hints at premium needs (e.g., hi-fi sound), recommend higher quality within budget or advise them on trade-offs.
-
-Stay helpful, focused on closing the sale, and speak like a trusted expert.
+💡 Always sound like a helpful expert guiding the buyer to the best decision. Prioritize products that **fit or slightly stretch** the budget with a clear reason why.
 `.trim();
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -177,7 +180,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No valid user message found' });
     }
 
-    // ✅ Extract full context from all messages, not just the last
+    // Extract full context from chat history
     let budget: number | undefined;
     let useCase: string | undefined;
     let location: string | undefined;
@@ -206,7 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const combinedText = normalizeText(p.title + ' ' + p.description);
       const price = parseFloat(p.variants.edges[0]?.node?.price?.amount || '0');
       const matchesQuery = combinedText.includes(userQuery);
-      const withinBudget = !budget || price <= budget;
+      const withinBudget = !budget || price <= budget * 1.25; // Allow 25% upsell
       return matchesQuery && withinBudget;
     });
 
