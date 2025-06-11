@@ -1,63 +1,55 @@
-import { useState, useEffect, useRef } from 'react';
-import Head from 'next/head';
-import axios from 'axios';
+import Head from 'next/head'
+import { useState } from 'react'
 
 export default function Home() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const chatBoxRef = useRef(null);
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState([])
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
-    setInput('');
-    setLoading(true);
-
-    try {
-      const response = await axios.post('/api/chat', { history: updatedMessages });
-      const botMsg = { role: 'assistant', content: response.data.reply };
-      setMessages([...updatedMessages, botMsg]);
-    } catch {
-      const errMsg = { role: 'assistant', content: 'Sorry, something went wrong.' };
-      setMessages([...updatedMessages, errMsg]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    chatBoxRef.current?.scrollTo({ top: chatBoxRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
+  const sendMessage = () => {
+    if (!input.trim()) return
+    const newMessage = { role: 'user', content: input }
+    setMessages([...messages, newMessage])
+    setInput('')
+  }
 
   return (
     <>
       <Head>
-        <title>Hifisti Shopping Assistant</title>
+        <title>Hifisti AI Assistant</title>
       </Head>
-      <div className="app-container">
-        <header className="app-header">🛍️ Hifisti AI Assistant</header>
-        <div className="chat-box" ref={chatBoxRef}>
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`message ${msg.role}`}>
-              {msg.content}
-            </div>
-          ))}
-          {loading && <div className="message assistant">Thinking...</div>}
-        </div>
-        <div className="input-area">
-          <input
-            type="text"
-            placeholder="Ask me anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          />
-          <button onClick={sendMessage}>Send</button>
-        </div>
+      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+        <header className="bg-white shadow p-4 text-xl font-bold flex items-center space-x-2">
+          <span>🛍️</span>
+          <span>Hifisti AI Assistant</span>
+        </header>
+
+        <main className="p-4 flex flex-col space-y-4 max-w-3xl mx-auto">
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              placeholder="Ask me anything..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              className="flex-grow border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            />
+            <button
+              onClick={sendMessage}
+              className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+            >
+              Send
+            </button>
+          </div>
+
+          <div className="mt-4 p-4 bg-white rounded-lg shadow space-y-2">
+            {messages.map((msg, idx) => (
+              <div key={idx} className="text-sm">
+                <strong>{msg.role === 'user' ? 'You' : 'Assistant'}:</strong> {msg.content}
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     </>
-  );
+  )
 }
