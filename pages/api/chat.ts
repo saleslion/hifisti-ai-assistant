@@ -57,17 +57,18 @@ const geminiResponse = await fetch(
 
     // === Try Groq Fallback ===
     if (GROQ_API_KEY) {
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'mixtral-8x7b-32768',
-          messages,
-        }),
-      });
+  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${GROQ_API_KEY}`,
+  },
+  body: JSON.stringify({
+    model: 'llama3-70b-8192',
+    messages,
+  }),
+});
+
 
       const groqData = await groqResponse.json();
       console.log('[Groq response]', JSON.stringify(groqData));
