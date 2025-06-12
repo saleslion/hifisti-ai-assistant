@@ -32,12 +32,13 @@ export default function ChatWidget() {
         body: JSON.stringify({
           messages: updatedMessages.map((msg) => ({
             role: msg.role,
-            text: msg.text, // FIXED: use text, not content
+            text: msg.text, // use text, not content
           })),
         }),
       });
 
       const data = await response.json();
+      console.log('[API DATA]', data); // <-- Diagnostic line
 
       const assistantMessage: Message = {
         role: 'assistant',
