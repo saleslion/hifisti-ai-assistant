@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm'; // For GitHub-flavored markdown (like links)
+import remarkGfm from 'remark-gfm';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -32,7 +32,7 @@ export default function ChatWidget() {
         body: JSON.stringify({
           messages: updatedMessages.map((msg) => ({
             role: msg.role,
-            content: msg.text,
+            text: msg.text, // FIXED: use text, not content
           })),
         }),
       });
